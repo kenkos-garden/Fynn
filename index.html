@@ -1143,10 +1143,18 @@ Rules: month=statement month e.g."May 2026", rent~600, insurance/mum transfer~70
 
     document.getElementById('proc-status').textContent = 'Parsing results…';
     const rawText = data.content.map(x => x.text || '').join('').replace(/```json|```/g,'').trim();
-    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error('No JSON in response: ' + rawText.slice(0,200));
-
-    const extracted = JSON.parse(jsonMatch[0]);
+    // Find and parse the JSON object robustly
+    let extracted;
+    try {
+      // Try direct parse first
+      extracted = JSON.parse(rawText);
+    } catch(e) {
+      // Find the JSON object in the response
+      const start = rawText.indexOf('{');
+      const end = rawText.lastIndexOf('}');
+      if (start === -1 || end === -1) throw new Error('No JSON found: ' + rawText.slice(0,200));
+      extracted = JSON.parse(rawText.slice(start, end + 1));
+    }
     extracted._acctName = acctName;
     extracted._acctType = selectedAcctType;
 
