@@ -7,7 +7,6 @@
 <link href="https://fonts.googleapis.com/css2?family=Clash+Display:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Geist:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
 :root {
   --bg: #080808;
@@ -1104,27 +1103,24 @@ async function analyseStatements() {
 
   try {
     document.getElementById('proc-status').textContent = 'Reading files…';
-    const contents = await Promise.all(uploadedFiles.map(readFileAsText));
-    document.getElementById('proc-status').textContent = 'Extracting categories…';
-
-    const combinedText = contents.map((c,i) => `--- ${uploadedFiles[i].name} ---\n${c}`).join('\n\n');
-    // Limit total size to avoid mobile memory issues
-    const truncated = combinedText.slice(0, 12000);
-
-    const prompt = `You are a Malaysian personal finance AI. Analyse these bank/e-wallet statements.
-
-Account: "${acctName}" (type: ${selectedAcctType})
-User: take-home RM ${DB.prefs.income||3517}, gross RM ${DB.prefs.gross||4000}
-
-STATEMENTS:
-${truncated}
-
-Return ONLY valid JSON (no markdown, no explanation):
-{"month":"Mon YYYY","income":${DB.prefs.income||3517},"gross":${DB.prefs.gross||4000},"epf":${DB.prefs.epf||483},"fixed":{"rent":0,"insurance":0,"loan":0,"gym":0},"variable":{"petrol":0,"food":0,"groceries":0,"shopping":0,"entertainment":0,"parking":0,"tolls":0,"transit":0,"tngFood":0},"loanActive":true}
-
-Rules: month=statement month e.g."May 2026", rent~600, insurance/family~700, loan~521, gym~155, petrol=Shell/Petron, food=restaurants/delivery, groceries=supermarket, shopping=retail, entertainment=GSC/TGV, parking=TNG parking, tolls=RFID, transit=LRT/bus, tngFood=TNG QR food. Use 0 if not found.`;
-
+    const fileContents = await Promise.all(uploadedFiles.map(readFileForClaude));
     document.getElementById('proc-status').textContent = 'Sending to AI…';
+
+    const systemPrompt = `You are a Malaysian personal finance AI. The user will give you bank/e-wallet statements. Extract spending data and return ONLY valid JSON with no markdown or explanation.`;
+
+    const userContent = [
+      ...fileContents,
+      {
+        type: 'text',
+        text: `Account: "${acctName}" (type: ${selectedAcctType})
+User income: take-home RM ${DB.prefs.income||0}, gross RM ${DB.prefs.gross||0}
+
+Analyse the statement(s) above and return ONLY this JSON structure:
+{"month":"Mon YYYY","income":${DB.prefs.income||0},"gross":${DB.prefs.gross||0},"epf":${DB.prefs.epf||0},"fixed":{"rent":0,"insurance":0,"loan":0,"gym":0},"variable":{"petrol":0,"food":0,"groceries":0,"shopping":0,"entertainment":0,"parking":0,"tolls":0,"transit":0,"tngFood":0},"loanActive":true}
+
+Rules: month=statement month e.g."May 2026", rent~600, insurance/mum transfer~700, personal loan~521, gym/fitness~155, petrol=Shell/Petron, food=restaurants/cafes/delivery, groceries=supermarket/mart, shopping=retail/misc, entertainment=GSC/TGV/cinema, parking=TNG parking, tolls=RFID/highway, transit=LRT/bus/MRT, tngFood=TNG QR food. Use 0 if not found. If income unknown use 0.`
+      }
+    ];
 
     const res = await fetch("https://michael.kenlooi2020.workers.dev", {
       method: "POST",
@@ -1132,7 +1128,8 @@ Rules: month=statement month e.g."May 2026", rent~600, insurance/family~700, loa
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
         max_tokens: 1000,
-        messages: [{ role: "user", content: prompt }]
+        system: systemPrompt,
+        messages: [{ role: "user", content: userContent }]
       })
     });
 
@@ -1147,7 +1144,7 @@ Rules: month=statement month e.g."May 2026", rent~600, insurance/family~700, loa
     document.getElementById('proc-status').textContent = 'Parsing results…';
     const rawText = data.content.map(x => x.text || '').join('').replace(/```json|```/g,'').trim();
     const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error('No JSON in response: ' + rawText.slice(0,150));
+    if (!jsonMatch) throw new Error('No JSON in response: ' + rawText.slice(0,200));
 
     const extracted = JSON.parse(jsonMatch[0]);
     extracted._acctName = acctName;
@@ -1165,34 +1162,38 @@ Rules: month=statement month e.g."May 2026", rent~600, insurance/family~700, loa
   }
 }
 
-async function readFileAsText(file) {
-  // CSV / TXT — read directly
-  if (!file.name.toLowerCase().endsWith('.pdf')) {
+// Read file the same way Claude chat handles uploads — base64 for PDF, text for CSV/TXT
+async function readFileForClaude(file) {
+  const isPDF = file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf';
+
+  if (isPDF) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = e => resolve((e.target.result || '').slice(0, 15000));
+      reader.onload = e => {
+        const base64 = e.target.result.split(',')[1]; // strip data:application/pdf;base64,
+        resolve({
+          type: 'document',
+          source: {
+            type: 'base64',
+            media_type: 'application/pdf',
+            data: base64
+          }
+        });
+      };
+      reader.onerror = () => reject(new Error('Could not read ' + file.name));
+      reader.readAsDataURL(file);
+    });
+  } else {
+    // CSV / TXT — send as plain text content block
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = e => resolve({
+        type: 'text',
+        text: `File: ${file.name}\n${(e.target.result || '').slice(0, 15000)}`
+      });
       reader.onerror = () => reject(new Error('Could not read ' + file.name));
       reader.readAsText(file, 'utf-8');
     });
-  }
-
-  // PDF — use PDF.js to extract real text
-  try {
-    const arrayBuffer = await file.arrayBuffer();
-    const pdfjsLib = window.pdfjsLib;
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    let fullText = '';
-    for (let i = 1; i <= Math.min(pdf.numPages, 20); i++) {
-      const page = await pdf.getPage(i);
-      const content = await page.getTextContent();
-      const pageText = content.items.map(item => item.str).join(' ');
-      fullText += pageText + '\n';
-      if (fullText.length > 15000) break;
-    }
-    return fullText.slice(0, 15000);
-  } catch(e) {
-    throw new Error('Could not read PDF: ' + e.message);
   }
 }
 
