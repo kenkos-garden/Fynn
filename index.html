@@ -539,6 +539,7 @@ input::placeholder{color:var(--muted);}
     <button class="nav-tab active" onclick="switchView('overview')">Overview</button>
     <button class="nav-tab" onclick="switchView('insights')">Insights</button>
     <button class="nav-tab" onclick="switchView('goals')">Goals</button>
+    <button class="nav-tab" onclick="switchView('guide')">Guide</button>
   </div>
   <div id="demo-banner" style="display:none;background:var(--accent-dim);border-bottom:0.5px solid var(--accent-dark);padding:10px 1.25rem;flex-direction:row;justify-content:space-between;align-items:center;gap:12px;">
     <div style="font-size:12px;color:var(--accent);">You're in demo mode — data won't be saved permanently.</div>
@@ -625,8 +626,70 @@ input::placeholder{color:var(--muted);}
       </div>
     </div>
 
-  </div><!-- /content -->
-</div><!-- /app -->
+    <!-- GUIDE -->
+    <div id="view-guide" style="display:none;">
+      <div class="slabel" style="margin-top:0;">How to import statements</div>
+      <div class="card" style="padding:1rem 1.2rem;margin-bottom:10px;">
+        <div style="font-size:13px;line-height:1.8;color:var(--muted);">
+          <div style="color:var(--text);font-weight:500;margin-bottom:6px;">Step 1 — Tap <span style="color:var(--accent);">+ Import</span> in the top right</div>
+          The Import button is always visible in the top bar. Tap it from any screen to open the import flow.
+        </div>
+        <div style="font-size:13px;line-height:1.8;color:var(--muted);margin-top:12px;">
+          <div style="color:var(--text);font-weight:500;margin-bottom:6px;">Step 2 — Select your statement type</div>
+          Choose Bank, Credit Card, or E-wallet. Then give the account a name (e.g. "UOB Debit", "TNG") so Fynn can track it over time.
+        </div>
+        <div style="font-size:13px;line-height:1.8;color:var(--muted);margin-top:12px;">
+          <div style="color:var(--text);font-weight:500;margin-bottom:6px;">Step 3 — Upload your file</div>
+          Tap "Select file" or drag and drop. Fynn accepts PDF, CSV, and TXT files from any Malaysian bank or e-wallet — UOB, Maybank, CIMB, RHB, TNG, Boost, GrabPay.
+        </div>
+        <div style="font-size:13px;line-height:1.8;color:var(--muted);margin-top:12px;">
+          <div style="color:var(--text);font-weight:500;margin-bottom:6px;">Step 4 — Review and save</div>
+          Fynn's AI reads your statement and extracts your spending into categories. Review the numbers — edit anything that looks off — then tap "Save month". Your Overview updates instantly.
+        </div>
+        <div style="background:var(--accent-dim);border-left:2px solid var(--accent);border-radius:0 6px 6px 0;padding:8px 12px;margin-top:14px;font-size:12px;color:var(--accent);line-height:1.6;">
+          💡 Uploading 3 months at once? Fynn averages the numbers automatically so your Overview shows a monthly picture, not a 3-month total.
+        </div>
+      </div>
+
+      <div class="slabel">How Insights works</div>
+      <div class="card" style="padding:1rem 1.2rem;margin-bottom:10px;">
+        <div style="font-size:13px;line-height:1.8;color:var(--muted);">
+          <div style="color:var(--text);font-weight:500;margin-bottom:6px;">Surplus trend</div>
+          The line chart shows your monthly surplus (take-home minus all spending) over time. An upward trend means you're keeping more each month.
+        </div>
+        <div style="font-size:13px;line-height:1.8;color:var(--muted);margin-top:12px;">
+          <div style="color:var(--text);font-weight:500;margin-bottom:6px;">Spending by category</div>
+          The stacked bar shows how much you spent in each category per month. Taller bars = more spending. Compare months to spot where your money is going.
+        </div>
+        <div style="font-size:13px;line-height:1.8;color:var(--muted);margin-top:12px;">
+          <div style="color:var(--text);font-weight:500;margin-bottom:6px;">Month comparison table</div>
+          The table at the bottom compares your last 2 months side by side — income, fixed, variable, and surplus — with the difference highlighted in green (better) or red (worse).
+        </div>
+        <div style="font-size:13px;line-height:1.8;color:var(--muted);margin-top:12px;">
+          <div style="color:var(--text);font-weight:500;margin-bottom:6px;">Changing the time period</div>
+          Use the tabs at the top — This month, 90 days, 120 days, 1 year, All time — to zoom in or out. You need at least 2 months of data for the charts to show trends.
+        </div>
+        <div style="background:var(--blue-bg);border-left:2px solid var(--blue);border-radius:0 6px 6px 0;padding:8px 12px;margin-top:14px;font-size:12px;color:var(--blue);line-height:1.6;">
+          💡 Insights only shows data you've already imported. The more months you upload, the more useful your trends become.
+        </div>
+      </div>
+
+      <div class="slabel">Understanding your numbers</div>
+      <div class="card" style="padding:1rem 1.2rem;">
+        <div style="font-size:13px;line-height:1.8;color:var(--muted);">
+          <div style="color:var(--text);font-weight:500;margin-bottom:4px;">Gross pay vs Take-home</div>
+          Gross is what your employer pays before deductions. Take-home is what lands in your account after EPF and tax.
+        </div>
+        <div style="font-size:13px;line-height:1.8;color:var(--muted);margin-top:10px;">
+          <div style="color:var(--text);font-weight:500;margin-bottom:4px;">EPF</div>
+          Employees Provident Fund — Malaysia's mandatory retirement contribution. 11% deducted from your salary automatically. Fynn calculates it as gross minus take-home unless you set it manually.
+        </div>
+        <div style="font-size:13px;line-height:1.8;color:var(--muted);margin-top:10px;">
+          <div style="color:var(--text);font-weight:500;margin-bottom:4px;">Monthly surplus vs Saved of take-home</div>
+          Surplus is what's left after all spending — money that hasn't been spent yet. "Saved of take-home" is what you've intentionally moved into EPF or savings goals. The difference matters: surplus can disappear on impulse buys; saved money is locked away on purpose.
+        </div>
+      </div>
+    </div>
 
 <!-- ══ MODALS ══ -->
 
@@ -913,7 +976,7 @@ async function syncData() {
 // ══════════════════════════════════════════════════════
 // VIEWS
 // ══════════════════════════════════════════════════════
-const views = ['overview','insights','goals'];
+const views = ['overview','insights','goals','guide'];
 let spendChart, surplusChart, stackedChart;
 let currentTimePeriod = 'month';
 
@@ -1227,7 +1290,8 @@ function renderOverview() {
 
   const ft = (d.fixedItems||[]).reduce((a,b)=>a+(b.amount||0),0) || Object.values(d.fixed||{}).reduce((a,b)=>a+b,0);
   const vt = (d.variableItems||[]).reduce((a,b)=>a+(b.amount||0),0) || Object.values(d.variable||{}).reduce((a,b)=>a+b,0);
-  const surplus = (d.income||0) - ft - vt;
+  const sideIncomeTotal = (d.sideIncomeItems||[]).reduce((a,b)=>a+(b.amount||0),0);
+  const surplus = (d.income||0) + sideIncomeTotal - ft - vt;
   const epf = d.epf || (d.gross - d.income) || 0;
 
   // Saved of take-home = EPF + goal deposits this month
@@ -1243,7 +1307,11 @@ function renderOverview() {
     <div class="metric"><div class="mv c-blue">${rm(goalDeposits)}</div><div class="ml">Goal deposits</div></div>
   `;
 
-  // Income — inline editable
+  // Income — inline editable with side income support
+  const sideItems = d.sideIncomeItems || [];
+  const sideTotal = sideItems.reduce((a,b)=>a+(b.amount||0),0);
+  const totalIncome = (d.income||0) + sideTotal;
+
   document.getElementById('income-card').innerHTML = `
     <div class="row" id="row-gross">
       <span>Gross pay</span>
@@ -1253,16 +1321,31 @@ function renderOverview() {
       </span>
     </div>
     <div class="row" id="row-epf">
-      <span>EPF deduction <span class="tag">auto</span></span>
+      <span>EPF deduction <span class="tag">auto</span>
+        <span class="tooltip-wrap"><span class="tooltip-icon">?</span><span class="tooltip-box">Employees Provident Fund — Malaysia's mandatory retirement saving. Calculated as gross minus take-home unless set manually.</span></span>
+      </span>
       <span style="color:var(--muted);">− ${rm(epf)}</span>
     </div>
     <div class="row" id="row-income">
-      <span>Take-home</span>
+      <span>Take-home (salary)</span>
       <span style="display:flex;align-items:center;gap:6px;">
         <span id="val-income" class="c-green" style="font-weight:500;">+ ${rm(d.income)}</span>
         <button class="edit-btn" onclick="editInline('income')">✎</button>
       </span>
     </div>
+    ${sideItems.map((item,i) => `
+    <div class="row">
+      <span style="display:flex;align-items:center;gap:4px;flex:1;min-width:0;">
+        <button class="del-row-btn" onclick="deleteSideIncome(${i})">✕</button>
+        <span id="side-label-${i}" style="cursor:pointer;" onclick="editSideLabel(${i})">${item.label}</span>
+      </span>
+      <span style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+        <span id="side-val-${i}" class="c-green">+ ${rm(item.amount)}</span>
+        <button class="edit-btn" onclick="editSideVal(${i})">✎</button>
+      </span>
+    </div>`).join('')}
+    ${sideTotal > 0 ? `<div class="row"><span style="color:var(--muted);">Total income</span><span class="c-green" style="font-weight:500;">${rm(totalIncome)}</span></div>` : ''}
+    <button class="add-row-btn" onclick="addSideIncome()">+ Add side income</button>
   `;
 
   // Fixed — inline editable with add/delete
@@ -1443,6 +1526,50 @@ function addVariableRow() {
   const label = prompt('Category name (e.g. Grab rides):', '') || 'New category';
   const amount = +prompt('Monthly amount (RM):', '0') || 0;
   d.variableItems.push({key:'custom_'+Date.now(), label, amount});
+  syncData(); renderOverview();
+}
+
+// ── Side income helpers ──
+function addSideIncome() {
+  const d = DB.months[DB.activeIdx];
+  if (!d.sideIncomeItems) d.sideIncomeItems = [];
+  const label = prompt('Income source name (e.g. Freelance, Rental, Grab):', '') || 'Side income';
+  const amount = +prompt('Monthly amount (RM):', '0') || 0;
+  d.sideIncomeItems.push({key:'side_'+Date.now(), label, amount});
+  syncData(); renderOverview();
+}
+
+function editSideVal(i) {
+  const d = DB.months[DB.activeIdx];
+  const el = document.getElementById('side-val-' + i);
+  const current = d.sideIncomeItems[i].amount;
+  el.innerHTML = `<input class="inline-input" type="number" value="${current}" onblur="saveSideVal(${i},this.value)" onkeydown="if(event.key==='Enter')this.blur()">`;
+  el.querySelector('input').focus();
+}
+
+function saveSideVal(i, val) {
+  const d = DB.months[DB.activeIdx];
+  d.sideIncomeItems[i].amount = +val || 0;
+  syncData(); renderOverview();
+}
+
+function editSideLabel(i) {
+  const d = DB.months[DB.activeIdx];
+  const el = document.getElementById('side-label-' + i);
+  const current = d.sideIncomeItems[i].label;
+  el.outerHTML = `<input class="inline-label" id="side-label-${i}" type="text" value="${current}" onblur="saveSideLabel(${i},this.value)" onkeydown="if(event.key==='Enter')this.blur()">`;
+  document.getElementById('side-label-' + i).focus();
+}
+
+function saveSideLabel(i, val) {
+  const d = DB.months[DB.activeIdx];
+  d.sideIncomeItems[i].label = val || d.sideIncomeItems[i].label;
+  syncData(); renderOverview();
+}
+
+function deleteSideIncome(i) {
+  const d = DB.months[DB.activeIdx];
+  d.sideIncomeItems.splice(i, 1);
   syncData(); renderOverview();
 }
 
