@@ -1155,6 +1155,27 @@ Rules: month=statement month e.g."May 2026", rent~600, insurance/mum transfer~70
       if (start === -1 || end === -1) throw new Error('No JSON found: ' + rawText.slice(0,200));
       extracted = JSON.parse(rawText.slice(start, end + 1));
     }
+    // Ensure all required fields exist with defaults
+    extracted.month = extracted.month || 'Unknown';
+    extracted.income = extracted.income || DB.prefs.income || 0;
+    extracted.gross = extracted.gross || DB.prefs.gross || 0;
+    extracted.epf = extracted.epf || DB.prefs.epf || 0;
+    extracted.fixed = extracted.fixed || {};
+    extracted.fixed.rent = extracted.fixed.rent || 0;
+    extracted.fixed.insurance = extracted.fixed.insurance || 0;
+    extracted.fixed.loan = extracted.fixed.loan || 0;
+    extracted.fixed.gym = extracted.fixed.gym || 0;
+    extracted.variable = extracted.variable || {};
+    extracted.variable.petrol = extracted.variable.petrol || 0;
+    extracted.variable.food = extracted.variable.food || 0;
+    extracted.variable.groceries = extracted.variable.groceries || 0;
+    extracted.variable.shopping = extracted.variable.shopping || 0;
+    extracted.variable.entertainment = extracted.variable.entertainment || 0;
+    extracted.variable.parking = extracted.variable.parking || 0;
+    extracted.variable.tolls = extracted.variable.tolls || 0;
+    extracted.variable.transit = extracted.variable.transit || 0;
+    extracted.variable.tngFood = extracted.variable.tngFood || 0;
+    extracted.loanActive = extracted.loanActive !== undefined ? extracted.loanActive : true;
     extracted._acctName = acctName;
     extracted._acctType = selectedAcctType;
 
