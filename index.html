@@ -274,9 +274,22 @@ input::placeholder{color:var(--muted);}
 .mock-gfill{height:3px;border-radius:2px;}
 .mock-upload{border:1px dashed var(--b2);border-radius:8px;padding:1.5rem;text-align:center;margin-top:8px;}
 
-/* ── Income prompt banner ── */
-.income-prompt{background:var(--amber-bg);border:0.5px solid var(--amber);border-radius:10px;padding:1rem 1.2rem;margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center;gap:12px;}
-.income-prompt-text{font-size:13px;color:var(--amber-l);line-height:1.5;}
+/* ── Inline editing ── */
+.row-edit{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:0.5px solid var(--b1);font-size:13px;gap:8px;}
+.row-edit:last-child{border-bottom:none;}
+.edit-btn{background:none;border:none;color:var(--muted2);cursor:pointer;font-size:12px;padding:2px 6px;border-radius:4px;transition:all 0.15s;flex-shrink:0;}
+.edit-btn:hover{color:var(--accent);background:var(--accent-dim);}
+.inline-input{background:var(--s3);border:0.5px solid var(--accent);border-radius:5px;color:var(--text);font-family:var(--mono);font-size:12px;padding:3px 8px;width:90px;outline:none;text-align:right;}
+.inline-label{background:var(--s3);border:0.5px solid var(--accent);border-radius:5px;color:var(--text);font-family:var(--sans);font-size:12px;padding:3px 8px;outline:none;flex:1;min-width:0;}
+.add-row-btn{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;padding:8px 0;border-top:0.5px solid var(--b1);margin-top:4px;background:none;border-left:none;border-right:none;border-bottom:none;width:100%;text-align:left;}
+.add-row-btn:hover{color:var(--accent);}
+.del-row-btn{background:none;border:none;color:var(--muted2);cursor:pointer;font-size:11px;padding:2px 4px;flex-shrink:0;}
+.del-row-btn:hover{color:var(--red);}
+
+/* ── AI summary paragraph ── */
+.ai-summary{background:var(--s2);border:0.5px solid var(--b2);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--muted);line-height:1.7;margin-bottom:1rem;}
+.ai-summary strong{color:var(--text);}
+
 
 </style>
 </head>
@@ -574,7 +587,7 @@ input::placeholder{color:var(--muted);}
         ondrop="handleDrop(event)">
         <div class="upload-icon">⬆</div>
         <div class="upload-title">Drop your statement here</div>
-        <div class="upload-sub">PDF · CSV · TXT · Any bank, credit card or e-wallet<br>UOB · Maybank · CIMB · RHB · TNG · Boost · GrabPay</div>
+        <div class="upload-sub">PDF · CSV · TXT · Any bank, credit card or e-wallet<br>UOB · Maybank · CIMB · RHB · TNG · Boost · GrabPay<br><span style="color:var(--accent);font-size:11px;">Multiple months? Fynn averages automatically.</span></div>
       </div>
       <div class="file-chips" id="file-chips" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;"></div>
       <input type="file" id="file-input" multiple accept=".pdf,.csv,.txt,.xlsx" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">
@@ -588,7 +601,10 @@ input::placeholder{color:var(--muted);}
 
       <div id="review-section" style="display:none;">
         <div class="slabel">Review — <span style="color:var(--amber-l);">edit anything before saving</span></div>
-        <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:1rem;" id="review-month-label"></div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:0.75rem;" id="review-month-label"></div>
+        <div class="ai-summary" id="ai-summary-box" style="display:none;">
+          <span id="ai-summary-text"></span>
+        </div>
         <div class="card" style="padding:0.75rem 1.2rem;margin-bottom:1rem;">
           <table class="rtable" id="review-table"></table>
         </div>
@@ -837,6 +853,18 @@ function rm(n) { return "RM " + Math.round(n||0).toLocaleString(); }
 function pct(a,b) { return b ? Math.round((a/b)*100) : 0; }
 
 // ── Overview ──
+function getMonthGoalDeposits(monthStr) {
+  // Sum all goal deposits tagged to this month
+  let total = 0;
+  DB.goals.forEach(g => {
+    (g.transactions||[]).forEach(t => {
+      if (t.type === 'add' && t.date && t.date.startsWith(monthStr)) total += t.amount;
+      if (t.type === 'use' && t.date && t.date.startsWith(monthStr)) total -= t.amount;
+    });
+  });
+  return Math.max(0, total);
+}
+
 function renderOverview() {
   if (!DB.months.length) {
     document.getElementById('overview-empty').style.display = 'block';
@@ -853,40 +881,94 @@ function renderOverview() {
   document.getElementById('month-tabs').innerHTML =
     DB.months.map((m,i) => `<button class="m-tab ${i===DB.activeIdx?'active':''}" onclick="setMonth(${i})">${m.month}</button>`).join('');
 
-  const ft = Object.values(d.fixed||{}).reduce((a,b)=>a+b,0);
-  const vt = Object.values(d.variable||{}).reduce((a,b)=>a+b,0);
+  const ft = (d.fixedItems||[]).reduce((a,b)=>a+(b.amount||0),0) || Object.values(d.fixed||{}).reduce((a,b)=>a+b,0);
+  const vt = (d.variableItems||[]).reduce((a,b)=>a+(b.amount||0),0) || Object.values(d.variable||{}).reduce((a,b)=>a+b,0);
   const surplus = (d.income||0) - ft - vt;
   const epf = d.epf || (d.gross - d.income) || 0;
-  const totalSaving = surplus + epf;
+
+  // Saved of take-home = EPF + goal deposits this month
+  const monthPrefix = d.month ? d.month.slice(0,3) + ' ' + d.month.slice(-4) : '';
+  const goalDeposits = getMonthGoalDeposits(d.month ? new Date(d.month).toISOString().slice(0,7) : '');
+  const totalSaved = epf + goalDeposits;
+  const savedPct = pct(totalSaved, d.income);
 
   document.getElementById('metrics').innerHTML = `
     <div class="metric"><div class="mv c-green">${rm(surplus)}</div><div class="ml">Monthly surplus</div></div>
-    <div class="metric"><div class="mv">${pct(surplus,d.income)}%</div><div class="ml">Saved of take-home</div></div>
+    <div class="metric"><div class="mv">${savedPct}%<div style="font-size:11px;font-family:var(--sans);color:var(--muted);margin-top:2px;">${rm(totalSaved)}</div></div><div class="ml">Saved of take-home</div></div>
     <div class="metric"><div class="mv c-green">${rm(epf)}</div><div class="ml">EPF auto-saved</div></div>
-    <div class="metric"><div class="mv c-blue">${rm(totalSaving)}</div><div class="ml">Total saving</div></div>
+    <div class="metric"><div class="mv c-blue">${rm(goalDeposits)}</div><div class="ml">Goal deposits</div></div>
   `;
 
+  // Income — inline editable
   document.getElementById('income-card').innerHTML = `
-    <div class="row"><span>Gross pay</span><span style="color:var(--muted);">${rm(d.gross)}</span></div>
-    <div class="row"><span>EPF deduction <span class="tag">auto</span></span><span style="color:var(--muted);">− ${rm(epf)}</span></div>
-    <div class="row"><span>Take-home</span><span class="c-green" style="font-weight:500;">+ ${rm(d.income)}</span></div>
+    <div class="row" id="row-gross">
+      <span>Gross pay</span>
+      <span style="display:flex;align-items:center;gap:6px;">
+        <span id="val-gross" style="color:var(--muted);">${rm(d.gross)}</span>
+        <button class="edit-btn" onclick="editInline('gross')">✎</button>
+      </span>
+    </div>
+    <div class="row" id="row-epf">
+      <span>EPF deduction <span class="tag">auto</span></span>
+      <span style="color:var(--muted);">− ${rm(epf)}</span>
+    </div>
+    <div class="row" id="row-income">
+      <span>Take-home</span>
+      <span style="display:flex;align-items:center;gap:6px;">
+        <span id="val-income" class="c-green" style="font-weight:500;">+ ${rm(d.income)}</span>
+        <button class="edit-btn" onclick="editInline('income')">✎</button>
+      </span>
+    </div>
   `;
 
-  const f = d.fixed||{};
-  document.getElementById('fixed-card').innerHTML = `
-    <div class="row"><span>Rent</span><span class="c-red">− ${rm(f.rent)}</span></div>
-    <div class="row"><span>Insurance + mum</span><span class="c-red">− ${rm(f.insurance)}</span></div>
-    <div class="row"><span>Personal loan ${d.loanActive?'<span class="tag">ends Apr 2027</span>':''}</span><span class="${d.loanActive?'c-red':'rl'}">− ${rm(f.loan)}</span></div>
-    <div class="row"><span>Gym — Anytime Fitness</span><span class="c-red">− ${rm(f.gym)}</span></div>
-    <div class="trow"><span>Fixed subtotal</span><span class="c-red">${rm(ft)}</span></div>
-  `;
+  // Fixed — inline editable with add/delete
+  const fixedItems = d.fixedItems || [
+    {key:'rent', label:'Rent', amount:d.fixed?.rent||0},
+    {key:'insurance', label:'Insurance + mum', amount:d.fixed?.insurance||0},
+    {key:'loan', label:'Personal loan', amount:d.fixed?.loan||0},
+    {key:'gym', label:'Gym — Anytime Fitness', amount:d.fixed?.gym||0},
+  ];
+  document.getElementById('fixed-card').innerHTML =
+    fixedItems.map((item,i) => `
+      <div class="row" id="fixed-row-${i}">
+        <span style="display:flex;align-items:center;gap:4px;flex:1;min-width:0;">
+          <button class="del-row-btn" onclick="deleteFixedRow(${i})">✕</button>
+          <span id="fixed-label-${i}" style="cursor:pointer;" onclick="editFixedLabel(${i})">${item.label}</span>
+        </span>
+        <span style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+          <span id="fixed-val-${i}" class="c-red">− ${rm(item.amount)}</span>
+          <button class="edit-btn" onclick="editFixedVal(${i})">✎</button>
+        </span>
+      </div>`).join('') +
+    `<div class="trow"><span>Fixed subtotal</span><span class="c-red">${rm(ft)}</span></div>
+    <button class="add-row-btn" onclick="addFixedRow()">+ Add commitment</button>`;
 
-  const v = d.variable||{};
-  const vKeys = ['petrol','food','groceries','shopping','entertainment','parking','tolls','transit','tngFood'];
-  const vLabels = ['Petrol','Food & dining','Groceries','Shopping','Entertainment','TNG parking','TNG tolls','TNG transit','TNG food QR'];
-  document.getElementById('variable-card').innerHTML = vKeys.map((k,i) =>
-    `<div class="row"><span>${vLabels[i]}</span><span class="c-amber">− ${rm(v[k])}</span></div>`
-  ).join('') + `<div class="trow"><span>Variable subtotal</span><span class="c-amber">${rm(vt)}</span></div>`;
+  // Variable — inline editable
+  const variableItems = d.variableItems || [
+    {key:'petrol',label:'Petrol',amount:d.variable?.petrol||0},
+    {key:'food',label:'Food & dining',amount:d.variable?.food||0},
+    {key:'groceries',label:'Groceries',amount:d.variable?.groceries||0},
+    {key:'shopping',label:'Shopping & misc',amount:d.variable?.shopping||0},
+    {key:'entertainment',label:'Entertainment',amount:d.variable?.entertainment||0},
+    {key:'parking',label:'TNG parking',amount:d.variable?.parking||0},
+    {key:'tolls',label:'TNG tolls',amount:d.variable?.tolls||0},
+    {key:'transit',label:'TNG transit',amount:d.variable?.transit||0},
+    {key:'tngFood',label:'TNG food QR',amount:d.variable?.tngFood||0},
+  ];
+  document.getElementById('variable-card').innerHTML =
+    variableItems.map((item,i) => `
+      <div class="row">
+        <span style="display:flex;align-items:center;gap:4px;flex:1;min-width:0;">
+          <button class="del-row-btn" onclick="deleteVariableRow(${i})">✕</button>
+          <span id="var-label-${i}" style="cursor:pointer;" onclick="editVarLabel(${i})">${item.label}</span>
+        </span>
+        <span style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+          <span id="var-val-${i}" class="c-amber">− ${rm(item.amount)}</span>
+          <button class="edit-btn" onclick="editVarVal(${i})">✎</button>
+        </span>
+      </div>`).join('') +
+    `<div class="trow"><span>Variable subtotal</span><span class="c-amber">${rm(vt)}</span></div>
+    <button class="add-row-btn" onclick="addVariableRow()">+ Add category</button>`;
 
   document.getElementById('final-card').innerHTML = `
     <div class="row"><span class="rl">Take-home</span><span style="font-weight:500;">${rm(d.income)}</span></div>
@@ -896,12 +978,153 @@ function renderOverview() {
   `;
 
   document.getElementById('banners').innerHTML = `
-    <div class="banner b-green">Including EPF, saving ~${rm(totalSaving)}/month — ${pct(totalSaving,d.gross)}% of gross.</div>
-    ${d.loanActive?`<div class="banner b-blue">Post-loan (May 2027): ${rm(f.loan)} freed up → ~${rm(surplus+(f.loan||0))}/month.</div>`:''}
+    <div class="banner b-green">EPF ${rm(epf)} + goal deposits ${rm(goalDeposits)} = ${rm(totalSaved)} saved (${savedPct}% of take-home).</div>
+    ${(d.fixed?.loan||0) > 0 && d.loanActive ? `<div class="banner b-blue">Post-loan (May 2027): ${rm(d.fixed?.loan||0)} freed up → ~${rm(surplus+(d.fixed?.loan||0))}/month.</div>` : ''}
   `;
 
+  // Render spend chart from variableItems
+  const vKeys = variableItems.map(i=>i.key);
+  const vLabels = variableItems.map(i=>i.label);
+  const v = {};
+  variableItems.forEach(i => v[i.key] = i.amount);
   renderSpendChart(v, vt, vLabels, vKeys);
 }
+
+// ── Inline edit helpers ──
+function editInline(field) {
+  const d = DB.months[DB.activeIdx];
+  const el = document.getElementById('val-' + field);
+  const current = field === 'gross' ? d.gross : d.income;
+  el.innerHTML = `<input class="inline-input" type="number" value="${current}" onblur="saveInline('${field}',this.value)" onkeydown="if(event.key==='Enter')this.blur()" style="width:90px;">`;
+  el.querySelector('input').focus();
+}
+
+function saveInline(field, val) {
+  const d = DB.months[DB.activeIdx];
+  d[field] = +val || 0;
+  syncData(); renderOverview();
+}
+
+function editFixedVal(i) {
+  const d = DB.months[DB.activeIdx];
+  if (!d.fixedItems) migrateFixed(d);
+  const el = document.getElementById('fixed-val-' + i);
+  const current = d.fixedItems[i].amount;
+  el.innerHTML = `<input class="inline-input" type="number" value="${current}" onblur="saveFixedVal(${i},this.value)" onkeydown="if(event.key==='Enter')this.blur()">`;
+  el.querySelector('input').focus();
+}
+
+function saveFixedVal(i, val) {
+  const d = DB.months[DB.activeIdx];
+  if (!d.fixedItems) migrateFixed(d);
+  d.fixedItems[i].amount = +val || 0;
+  syncData(); renderOverview();
+}
+
+function editFixedLabel(i) {
+  const d = DB.months[DB.activeIdx];
+  if (!d.fixedItems) migrateFixed(d);
+  const el = document.getElementById('fixed-label-' + i);
+  const current = d.fixedItems[i].label;
+  el.outerHTML = `<input class="inline-label" id="fixed-label-${i}" type="text" value="${current}" onblur="saveFixedLabel(${i},this.value)" onkeydown="if(event.key==='Enter')this.blur()">`;
+  document.getElementById('fixed-label-' + i).focus();
+}
+
+function saveFixedLabel(i, val) {
+  const d = DB.months[DB.activeIdx];
+  if (!d.fixedItems) migrateFixed(d);
+  d.fixedItems[i].label = val || d.fixedItems[i].label;
+  syncData(); renderOverview();
+}
+
+function deleteFixedRow(i) {
+  const d = DB.months[DB.activeIdx];
+  if (!d.fixedItems) migrateFixed(d);
+  d.fixedItems.splice(i, 1);
+  syncData(); renderOverview();
+}
+
+function addFixedRow() {
+  const d = DB.months[DB.activeIdx];
+  if (!d.fixedItems) migrateFixed(d);
+  const suggestions = ['Car loan','Credit card','Phone bill','Internet','Netflix','Spotify','Insurance','Education loan','Rent'];
+  const label = prompt('Commitment name (e.g. Car loan):', '') || 'New commitment';
+  const amount = +prompt('Monthly amount (RM):', '0') || 0;
+  d.fixedItems.push({key:'custom_'+Date.now(), label, amount});
+  syncData(); renderOverview();
+}
+
+function editVarVal(i) {
+  const d = DB.months[DB.activeIdx];
+  if (!d.variableItems) migrateVariable(d);
+  const el = document.getElementById('var-val-' + i);
+  const current = d.variableItems[i].amount;
+  el.innerHTML = `<input class="inline-input" type="number" value="${current}" onblur="saveVarVal(${i},this.value)" onkeydown="if(event.key==='Enter')this.blur()">`;
+  el.querySelector('input').focus();
+}
+
+function saveVarVal(i, val) {
+  const d = DB.months[DB.activeIdx];
+  if (!d.variableItems) migrateVariable(d);
+  d.variableItems[i].amount = +val || 0;
+  syncData(); renderOverview();
+}
+
+function editVarLabel(i) {
+  const d = DB.months[DB.activeIdx];
+  if (!d.variableItems) migrateVariable(d);
+  const el = document.getElementById('var-label-' + i);
+  const current = d.variableItems[i].label;
+  el.outerHTML = `<input class="inline-label" id="var-label-${i}" type="text" value="${current}" onblur="saveVarLabel(${i},this.value)" onkeydown="if(event.key==='Enter')this.blur()">`;
+  document.getElementById('var-label-' + i).focus();
+}
+
+function saveVarLabel(i, val) {
+  const d = DB.months[DB.activeIdx];
+  if (!d.variableItems) migrateVariable(d);
+  d.variableItems[i].label = val || d.variableItems[i].label;
+  syncData(); renderOverview();
+}
+
+function deleteVariableRow(i) {
+  const d = DB.months[DB.activeIdx];
+  if (!d.variableItems) migrateVariable(d);
+  d.variableItems.splice(i, 1);
+  syncData(); renderOverview();
+}
+
+function addVariableRow() {
+  const d = DB.months[DB.activeIdx];
+  if (!d.variableItems) migrateVariable(d);
+  const label = prompt('Category name (e.g. Grab rides):', '') || 'New category';
+  const amount = +prompt('Monthly amount (RM):', '0') || 0;
+  d.variableItems.push({key:'custom_'+Date.now(), label, amount});
+  syncData(); renderOverview();
+}
+
+function migrateFixed(d) {
+  d.fixedItems = [
+    {key:'rent', label:'Rent', amount:d.fixed?.rent||0},
+    {key:'insurance', label:'Insurance + mum', amount:d.fixed?.insurance||0},
+    {key:'loan', label:'Personal loan', amount:d.fixed?.loan||0},
+    {key:'gym', label:'Gym — Anytime Fitness', amount:d.fixed?.gym||0},
+  ].filter(i => i.amount > 0);
+}
+
+function migrateVariable(d) {
+  d.variableItems = [
+    {key:'petrol',label:'Petrol',amount:d.variable?.petrol||0},
+    {key:'food',label:'Food & dining',amount:d.variable?.food||0},
+    {key:'groceries',label:'Groceries',amount:d.variable?.groceries||0},
+    {key:'shopping',label:'Shopping & misc',amount:d.variable?.shopping||0},
+    {key:'entertainment',label:'Entertainment',amount:d.variable?.entertainment||0},
+    {key:'parking',label:'TNG parking',amount:d.variable?.parking||0},
+    {key:'tolls',label:'TNG tolls',amount:d.variable?.tolls||0},
+    {key:'transit',label:'TNG transit',amount:d.variable?.transit||0},
+    {key:'tngFood',label:'TNG food QR',amount:d.variable?.tngFood||0},
+  ].filter(i => i.amount > 0);
+}
+
 
 function renderSpendChart(v, vt, vLabels, vKeys) {
   const vals = vKeys.map(k => v[k]||0);
@@ -971,8 +1194,12 @@ let goalColor = '#1D9E75';
 function renderGoals() {
   const list = document.getElementById('goals-list');
   const empty = document.getElementById('goals-empty');
-  if(!DB.goals.length) { list.innerHTML=''; empty.style.display='block'; return; }
-  empty.style.display='none';
+  if (!DB.goals || !DB.goals.length) {
+    list.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
   list.innerHTML = DB.goals.map((g,i) => {
     const p = Math.min(100, Math.round((g.saved/g.target)*100));
     const txns = (g.transactions||[]).slice().reverse();
@@ -1057,6 +1284,7 @@ let pendingReview = null;
 
 function selectAcctType(el, type) {
   selectedAcctType = type;
+  localStorage.setItem('fynn_last_acct_type', type);
   document.querySelectorAll('.acct-type').forEach(x => x.classList.remove('selected'));
   el.classList.add('selected');
 }
@@ -1115,10 +1343,19 @@ async function analyseStatements() {
         text: `Account: "${acctName}" (type: ${selectedAcctType})
 User income: take-home RM ${DB.prefs.income||0}, gross RM ${DB.prefs.gross||0}
 
-Analyse the statement(s) above and return ONLY this JSON structure:
-{"month":"Mon YYYY","income":${DB.prefs.income||0},"gross":${DB.prefs.gross||0},"epf":${DB.prefs.epf||0},"fixed":{"rent":0,"insurance":0,"loan":0,"gym":0},"variable":{"petrol":0,"food":0,"groceries":0,"shopping":0,"entertainment":0,"parking":0,"tolls":0,"transit":0,"tngFood":0},"loanActive":true}
+Analyse the statement(s) above. If multiple months are present, calculate the MONTHLY AVERAGE for all spending categories — do not sum totals across months.
 
-Rules: month=statement month e.g."May 2026", rent~600, insurance/mum transfer~700, personal loan~521, gym/fitness~155, petrol=Shell/Petron, food=restaurants/cafes/delivery, groceries=supermarket/mart, shopping=retail/misc, entertainment=GSC/TGV/cinema, parking=TNG parking, tolls=RFID/highway, transit=LRT/bus/MRT, tngFood=TNG QR food. Use 0 if not found. If income unknown use 0.`
+Return ONLY this JSON structure (no markdown):
+{"summary":"One sentence: what you found and averaged e.g. Found 3 months of UOB data (Jan–Mar 2026). Monthly averages calculated.","month":"Mon YYYY","income":${DB.prefs.income||0},"gross":${DB.prefs.gross||0},"epf":${DB.prefs.epf||0},"fixed":{"rent":0,"insurance":0,"loan":0,"gym":0},"variable":{"petrol":0,"food":0,"groceries":0,"shopping":0,"entertainment":0,"parking":0,"tolls":0,"transit":0,"tngFood":0},"loanActive":true}
+
+Rules:
+- month: most recent month e.g."Apr 2026"
+- If multiple months: divide all variable totals by number of months
+- rent~600, insurance/mum transfer~700, personal loan~521, gym/fitness~155
+- petrol=Shell/Petron, food=restaurants/cafes/delivery, groceries=supermarket/mart
+- shopping=retail/misc, entertainment=GSC/TGV/cinema, parking=TNG parking
+- tolls=RFID/highway, transit=LRT/bus/MRT, tngFood=TNG QR food
+- Use 0 if not found`
       }
     ];
 
@@ -1162,28 +1399,35 @@ Rules: month=statement month e.g."May 2026", rent~600, insurance/mum transfer~70
     extracted.gross = extracted.gross || DB.prefs.gross || 0;
     extracted.epf = extracted.epf || DB.prefs.epf || 0;
     extracted.fixed = extracted.fixed || {};
-    extracted.fixed.rent = extracted.fixed.rent || 0;
-    extracted.fixed.insurance = extracted.fixed.insurance || 0;
-    extracted.fixed.loan = extracted.fixed.loan || 0;
-    extracted.fixed.gym = extracted.fixed.gym || 0;
     extracted.variable = extracted.variable || {};
-    extracted.variable.petrol = extracted.variable.petrol || 0;
-    extracted.variable.food = extracted.variable.food || 0;
-    extracted.variable.groceries = extracted.variable.groceries || 0;
-    extracted.variable.shopping = extracted.variable.shopping || 0;
-    extracted.variable.entertainment = extracted.variable.entertainment || 0;
-    extracted.variable.parking = extracted.variable.parking || 0;
-    extracted.variable.tolls = extracted.variable.tolls || 0;
-    extracted.variable.transit = extracted.variable.transit || 0;
-    extracted.variable.tngFood = extracted.variable.tngFood || 0;
     extracted.loanActive = extracted.loanActive !== undefined ? extracted.loanActive : true;
+
+    // Extract summary and build items arrays
+    const summary = extracted.summary || '';
+    extracted.fixedItems = [
+      {key:'rent', label:'Rent', amount:extracted.fixed.rent||0},
+      {key:'insurance', label:'Insurance + mum', amount:extracted.fixed.insurance||0},
+      {key:'loan', label:'Personal loan', amount:extracted.fixed.loan||0},
+      {key:'gym', label:'Gym — Anytime Fitness', amount:extracted.fixed.gym||0},
+    ].filter(i => i.amount > 0);
+    extracted.variableItems = [
+      {key:'petrol',label:'Petrol',amount:extracted.variable.petrol||0},
+      {key:'food',label:'Food & dining',amount:extracted.variable.food||0},
+      {key:'groceries',label:'Groceries',amount:extracted.variable.groceries||0},
+      {key:'shopping',label:'Shopping & misc',amount:extracted.variable.shopping||0},
+      {key:'entertainment',label:'Entertainment',amount:extracted.variable.entertainment||0},
+      {key:'parking',label:'TNG parking',amount:extracted.variable.parking||0},
+      {key:'tolls',label:'TNG tolls',amount:extracted.variable.tolls||0},
+      {key:'transit',label:'TNG transit',amount:extracted.variable.transit||0},
+      {key:'tngFood',label:'TNG food QR',amount:extracted.variable.tngFood||0},
+    ].filter(i => i.amount > 0);
+
     extracted._acctName = acctName;
     extracted._acctType = selectedAcctType;
 
     proc.classList.remove('show');
     document.getElementById('drop-zone').style.display = 'block';
-    showReview(extracted);
-    // Scroll review into view on mobile
+    showReview(extracted, summary);
     setTimeout(() => {
       document.getElementById('review-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 100);
@@ -1225,10 +1469,20 @@ async function readFileForClaude(file) {
   }
 }
 
-function showReview(extracted) {
+function showReview(extracted, summary) {
   pendingReview = extracted;
   document.getElementById('review-month-label').textContent = `Month: ${extracted.month||'?'} · Account: ${extracted._acctName}`;
-  document.getElementById('review-section').style.display='block';
+
+  // Show AI summary if provided
+  const summaryEl = document.getElementById('ai-summary-text');
+  if (summaryEl && summary) {
+    summaryEl.textContent = summary;
+    summaryEl.parentElement.style.display = 'block';
+  } else if (summaryEl) {
+    summaryEl.parentElement.style.display = 'none';
+  }
+
+  document.getElementById('review-section').style.display = 'block';
 
   const rows = [
     {s:'Income',k:'income',l:'Take-home pay',v:extracted.income},
@@ -1342,6 +1596,16 @@ document.addEventListener('DOMContentLoaded', function() {
   const fi = document.getElementById('file-input');
   const selectBtn = document.getElementById('select-file-btn');
   const analyseBtn = document.getElementById('analyse-btn');
+
+  // Restore last account type selection
+  const lastType = localStorage.getItem('fynn_last_acct_type');
+  if (lastType) {
+    selectedAcctType = lastType;
+    document.querySelectorAll('.acct-type').forEach(el => {
+      if (el.dataset.type === lastType) el.classList.add('selected');
+      else el.classList.remove('selected');
+    });
+  }
 
   // Select file button triggers file picker
   selectBtn.addEventListener('click', function(e) {
