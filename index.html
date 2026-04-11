@@ -286,6 +286,38 @@ input::placeholder{color:var(--muted);}
 .del-row-btn{background:none;border:none;color:var(--muted2);cursor:pointer;font-size:11px;padding:2px 4px;flex-shrink:0;}
 .del-row-btn:hover{color:var(--red);}
 
+/* ── Quiz / Onboarding ── */
+#quiz-screen{position:fixed;inset:0;background:var(--bg);z-index:300;display:none;align-items:center;justify-content:center;padding:1.5rem;}
+#quiz-screen.show{display:flex;}
+.quiz-box{width:100%;max-width:480px;}
+.quiz-progress{display:flex;gap:4px;margin-bottom:2rem;}
+.quiz-pip{flex:1;height:3px;border-radius:2px;background:var(--b2);transition:background 0.3s;}
+.quiz-pip.done{background:var(--accent);}
+.quiz-q{font-family:var(--display);font-size:22px;font-weight:500;margin-bottom:0.5rem;line-height:1.3;}
+.quiz-sub{font-size:13px;color:var(--muted);margin-bottom:1.75rem;}
+.quiz-opts{display:flex;flex-direction:column;gap:8px;}
+.quiz-opt{background:var(--s1);border:0.5px solid var(--b2);border-radius:10px;padding:12px 16px;font-size:13px;cursor:pointer;transition:all 0.15s;text-align:left;color:var(--text);}
+.quiz-opt:hover{border-color:var(--b3);background:var(--s2);}
+.quiz-opt.selected{border-color:var(--accent-dark);background:var(--accent-dim);color:var(--accent);}
+.quiz-nav{display:flex;justify-content:space-between;align-items:center;margin-top:1.5rem;}
+.quiz-step{font-family:var(--mono);font-size:11px;color:var(--muted);}
+
+/* ── Import modal ── */
+#modal-import .modal{max-width:480px;}
+.import-btn{font-family:var(--mono);font-size:11px;padding:5px 12px;border-radius:6px;border:0.5px solid var(--accent-dark);background:var(--accent-dim);color:var(--accent);cursor:pointer;transition:all 0.15s;}
+.import-btn:hover{background:rgba(200,240,77,0.2);}
+
+/* ── Insights ── */
+.time-tabs{display:flex;gap:4px;margin-bottom:1.5rem;background:var(--s1);border-radius:8px;padding:3px;}
+.time-tab{flex:1;text-align:center;font-family:var(--mono);font-size:10px;padding:6px 4px;border-radius:6px;border:none;background:transparent;color:var(--muted);cursor:pointer;transition:all 0.15s;}
+.time-tab.active{background:var(--s2);color:var(--text);}
+
+/* ── Tooltips ── */
+.tooltip-wrap{position:relative;display:inline-block;}
+.tooltip-icon{font-size:10px;color:var(--muted2);cursor:pointer;border:0.5px solid var(--muted2);border-radius:50%;width:14px;height:14px;display:inline-flex;align-items:center;justify-content:center;margin-left:4px;font-family:var(--mono);}
+.tooltip-box{position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--s3);border:0.5px solid var(--b3);border-radius:8px;padding:8px 12px;font-size:11px;color:var(--text);width:200px;line-height:1.5;z-index:100;display:none;white-space:normal;}
+.tooltip-wrap:hover .tooltip-box{display:block;}
+
 /* ── AI summary paragraph ── */
 .ai-summary{background:var(--s2);border:0.5px solid var(--b2);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--muted);line-height:1.7;margin-bottom:1rem;}
 .ai-summary strong{color:var(--text);}
@@ -474,21 +506,39 @@ input::placeholder{color:var(--muted);}
 
 </div>
 
+<!-- ══ QUIZ SCREEN ══ -->
+<div id="quiz-screen">
+  <div class="quiz-box fade-in">
+    <div class="quiz-progress" id="quiz-progress"></div>
+    <div class="quiz-q" id="quiz-q"></div>
+    <div class="quiz-sub" id="quiz-sub"></div>
+    <div class="quiz-opts" id="quiz-opts"></div>
+    <div class="quiz-nav">
+      <span class="quiz-step" id="quiz-step"></span>
+      <button class="btn btn-primary" id="quiz-next-btn" onclick="quizNext()" style="padding:8px 20px;">Continue</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TOAST ══ -->
+<div class="toast" id="toast"></div>
+
 <!-- ══ APP ══ -->
 <div id="app">
   <div class="topbar">
     <div class="logo">Fy<span>nn</span></div>
-    <div class="user-chip" onclick="openModal('modal-profile')">
-      <div class="avatar" id="user-avatar">—</div>
-      <span id="user-name-label" style="display:none;"></span>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <button class="import-btn" onclick="openModal('modal-import')">+ Import</button>
+      <div class="user-chip" onclick="openModal('modal-profile')">
+        <div class="avatar" id="user-avatar">—</div>
+      </div>
     </div>
   </div>
 
   <div class="nav">
     <button class="nav-tab active" onclick="switchView('overview')">Overview</button>
-    <button class="nav-tab" onclick="switchView('accounts')">Accounts</button>
+    <button class="nav-tab" onclick="switchView('insights')">Insights</button>
     <button class="nav-tab" onclick="switchView('goals')">Goals</button>
-    <button class="nav-tab" onclick="switchView('upload')">Upload</button>
   </div>
   <div id="demo-banner" style="display:none;background:var(--accent-dim);border-bottom:0.5px solid var(--accent-dark);padding:10px 1.25rem;flex-direction:row;justify-content:space-between;align-items:center;gap:12px;">
     <div style="font-size:12px;color:var(--accent);">You're in demo mode — data won't be saved permanently.</div>
@@ -507,8 +557,8 @@ input::placeholder{color:var(--muted);}
       <div id="overview-empty" class="empty" style="display:none;">
         <div class="empty-icon">📂</div>
         <div class="empty-title">No data yet</div>
-        <div class="empty-sub">Upload your bank or e-wallet statements<br>to see your financial overview.</div>
-        <button class="btn btn-accent" style="margin-top:1rem;" onclick="switchView('upload')">Upload statements</button>
+        <div class="empty-sub">Import your bank or e-wallet statements<br>to see your financial overview.</div>
+        <button class="btn btn-accent" style="margin-top:1rem;" onclick="openModal('modal-import')">Import statements</button>
       </div>
       <div id="overview-content">
         <div class="slabel">Summary</div>
@@ -531,18 +581,33 @@ input::placeholder{color:var(--muted);}
       </div>
     </div>
 
-    <!-- ACCOUNTS -->
-    <div id="view-accounts" style="display:none;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
-        <div class="slabel" style="margin:0;">Connected accounts</div>
-        <button class="btn btn-accent" onclick="switchView('upload')">+ Add account data</button>
+    <!-- INSIGHTS -->
+    <div id="view-insights" style="display:none;">
+      <div class="time-tabs" id="time-tabs">
+        <button class="time-tab active" onclick="setTimePeriod('month',this)">This month</button>
+        <button class="time-tab" onclick="setTimePeriod('90d',this)">90 days</button>
+        <button class="time-tab" onclick="setTimePeriod('120d',this)">120 days</button>
+        <button class="time-tab" onclick="setTimePeriod('1y',this)">1 year</button>
+        <button class="time-tab" onclick="setTimePeriod('all',this)">All time</button>
       </div>
-      <div id="accounts-list"></div>
-      <div id="accounts-empty" class="empty" style="display:none;">
-        <div class="empty-icon">🏦</div>
-        <div class="empty-title">No accounts yet</div>
-        <div class="empty-sub">Upload statements from your bank,<br>credit card or e-wallet to get started.</div>
-        <button class="btn btn-accent" style="margin-top:1rem;" onclick="switchView('upload')">Upload statements</button>
+      <div id="insights-empty" class="empty" style="display:none;">
+        <div class="empty-icon">📊</div>
+        <div class="empty-title">No data yet</div>
+        <div class="empty-sub">Import at least one month of statements<br>to see your trends.</div>
+        <button class="btn btn-accent" style="margin-top:1rem;" onclick="openModal('modal-import')">Import statements</button>
+      </div>
+      <div id="insights-content">
+        <div class="slabel">Surplus trend</div>
+        <div class="card" style="padding:0.75rem 1.2rem;">
+          <div class="chart-wrap"><canvas id="surplusChart" role="img" aria-label="Surplus trend">Surplus over time.</canvas></div>
+        </div>
+        <div class="slabel">Spending by category</div>
+        <div class="card" style="padding:0.75rem 1.2rem;">
+          <div class="legend" id="insights-legend"></div>
+          <div class="chart-wrap"><canvas id="stackedChart" role="img" aria-label="Spending by category over time">Spending breakdown over time.</canvas></div>
+        </div>
+        <div class="slabel">Month comparison</div>
+        <div id="month-compare-table"></div>
       </div>
     </div>
 
@@ -560,65 +625,69 @@ input::placeholder{color:var(--muted);}
       </div>
     </div>
 
-    <!-- UPLOAD -->
-    <div id="view-upload" style="display:none;">
-      <div class="slabel">What type of statement?</div>
-      <div class="acct-types" id="acct-type-picker">
-        <div class="acct-type selected" onclick="selectAcctType(this,'bank')" data-type="bank">
-          <div class="acct-type-icon">🏦</div>
-          <div class="acct-type-label">Bank</div>
-        </div>
-        <div class="acct-type" onclick="selectAcctType(this,'credit')" data-type="credit">
-          <div class="acct-type-icon">💳</div>
-          <div class="acct-type-label">Credit card</div>
-        </div>
-        <div class="acct-type" onclick="selectAcctType(this,'ewallet')" data-type="ewallet">
-          <div class="acct-type-icon">📱</div>
-          <div class="acct-type-label">E-wallet</div>
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Account name (e.g. UOB Credit, TNG, Maybank Savings)</label>
-        <input type="text" id="acct-name-input" placeholder="e.g. UOB Credit Card">
-      </div>
-      <div class="upload-zone" id="drop-zone"
-        ondragover="event.preventDefault();this.classList.add('drag')"
-        ondragleave="this.classList.remove('drag')"
-        ondrop="handleDrop(event)">
-        <div class="upload-icon">⬆</div>
-        <div class="upload-title">Drop your statement here</div>
-        <div class="upload-sub">PDF · CSV · TXT · Any bank, credit card or e-wallet<br>UOB · Maybank · CIMB · RHB · TNG · Boost · GrabPay<br><span style="color:var(--accent);font-size:11px;">Multiple months? Fynn averages automatically.</span></div>
-      </div>
-      <div class="file-chips" id="file-chips" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;"></div>
-      <input type="file" id="file-input" multiple accept=".pdf,.csv,.txt,.xlsx" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">
-      <button class="btn btn-accent" id="select-file-btn" style="width:100%;margin-top:10px;padding:12px;font-size:13px;">Select file</button>
-      <button class="btn btn-primary" id="analyse-btn" style="width:100%;margin-top:8px;padding:12px;font-size:13px;display:none;">Analyse statement</button>
-
-      <div class="processing" id="processing">
-        <div class="spinner"></div>
-        <div style="font-size:13px;color:var(--muted);" id="proc-status">Reading your statement<span class="proc-dots"></span></div>
-      </div>
-
-      <div id="review-section" style="display:none;">
-        <div class="slabel">Review — <span style="color:var(--amber-l);">edit anything before saving</span></div>
-        <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:0.75rem;" id="review-month-label"></div>
-        <div class="ai-summary" id="ai-summary-box" style="display:none;">
-          <span id="ai-summary-text"></span>
-        </div>
-        <div class="card" style="padding:0.75rem 1.2rem;margin-bottom:1rem;">
-          <table class="rtable" id="review-table"></table>
-        </div>
-        <div style="display:flex;gap:8px;">
-          <button class="btn btn-primary" onclick="saveReview()">Save month</button>
-          <button class="btn" onclick="cancelReview()">Cancel</button>
-        </div>
-      </div>
-    </div>
-
   </div><!-- /content -->
 </div><!-- /app -->
 
 <!-- ══ MODALS ══ -->
+
+<!-- Import Modal -->
+<div class="modal-bg" id="modal-import">
+  <div class="modal" id="modal-import-inner">
+    <div class="modal-title">Import statements</div>
+    <div class="slabel" style="margin-top:0;">What type of statement?</div>
+    <div class="acct-types" id="acct-type-picker">
+      <div class="acct-type selected" onclick="selectAcctType(this,'bank')" data-type="bank">
+        <div class="acct-type-icon">🏦</div>
+        <div class="acct-type-label">Bank</div>
+      </div>
+      <div class="acct-type" onclick="selectAcctType(this,'credit')" data-type="credit">
+        <div class="acct-type-icon">💳</div>
+        <div class="acct-type-label">Credit card</div>
+      </div>
+      <div class="acct-type" onclick="selectAcctType(this,'ewallet')" data-type="ewallet">
+        <div class="acct-type-icon">📱</div>
+        <div class="acct-type-label">E-wallet</div>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Account name</label>
+      <input type="text" id="acct-name-input" placeholder="e.g. UOB Credit Card, TNG, Maybank">
+    </div>
+    <div class="upload-zone" id="drop-zone"
+      ondragover="event.preventDefault();this.classList.add('drag')"
+      ondragleave="this.classList.remove('drag')"
+      ondrop="handleDrop(event)">
+      <div class="upload-icon">⬆</div>
+      <div class="upload-title">Drop your statement here</div>
+      <div class="upload-sub">PDF · CSV · TXT · UOB · Maybank · CIMB · TNG · Boost<br><span style="color:var(--accent);font-size:11px;">Multiple months? Fynn averages automatically.</span></div>
+    </div>
+    <div class="file-chips" id="file-chips" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;"></div>
+    <input type="file" id="file-input" multiple accept=".pdf,.csv,.txt,.xlsx" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">
+    <button class="btn btn-accent" id="select-file-btn" style="width:100%;margin-top:10px;padding:12px;font-size:13px;">Select file</button>
+    <button class="btn btn-primary" id="analyse-btn" style="width:100%;margin-top:8px;padding:12px;font-size:13px;display:none;">Analyse statement</button>
+
+    <div class="processing" id="processing">
+      <div class="spinner"></div>
+      <div style="font-size:13px;color:var(--muted);" id="proc-status">Reading your statement<span class="proc-dots"></span></div>
+    </div>
+
+    <div id="review-section" style="display:none;">
+      <div class="slabel">Review — <span style="color:var(--amber-l);">edit anything before saving</span></div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:0.75rem;" id="review-month-label"></div>
+      <div class="ai-summary" id="ai-summary-box" style="display:none;">
+        <span id="ai-summary-text"></span>
+      </div>
+      <div class="card" style="padding:0.75rem 1.2rem;margin-bottom:1rem;">
+        <table class="rtable" id="review-table"></table>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-primary" onclick="saveReview()">Save month</button>
+        <button class="btn" onclick="cancelReview()">Cancel</button>
+      </div>
+    </div>
+    <div class="modal-actions"><button class="btn" onclick="closeImportModal()">Close</button></div>
+  </div>
+</div>
 
 <!-- Add Goal -->
 <div class="modal-bg" id="modal-add-goal">
@@ -628,6 +697,10 @@ input::placeholder{color:var(--muted);}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
       <div><label class="form-label">Target (RM)</label><input type="number" id="new-goal-target" placeholder="10000"></div>
       <div><label class="form-label">Already saved (RM)</label><input type="number" id="new-goal-saved" placeholder="0"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+      <div><label class="form-label">Start date</label><input type="date" id="new-goal-start"></div>
+      <div><label class="form-label">Target date (optional)</label><input type="date" id="new-goal-end"></div>
     </div>
     <div class="form-group">
       <label class="form-label">Colour</label>
@@ -807,11 +880,16 @@ function enterApp(email) {
   document.getElementById('pref-epf').value = DB.prefs.epf || '';
   const demoBanner = document.getElementById('demo-banner');
   if (isDemo) { demoBanner.style.display = 'flex'; } else { demoBanner.style.display = 'none'; }
-  // Show income prompt if not set
   const incomePrompt = document.getElementById('income-prompt');
   if (!DB.prefs.income && !DB.prefs.gross) { incomePrompt.style.display = 'flex'; } else { incomePrompt.style.display = 'none'; }
   renderAll();
+  // Trigger quiz for new users
+  if (!DB.prefs.quizDone) {
+    setTimeout(() => startQuiz(), 400);
+  }
 }
+
+function renderAll() { renderOverview(); }
 
 // ══════════════════════════════════════════════════════
 // SUPABASE DATA SYNC
@@ -835,18 +913,284 @@ async function syncData() {
 // ══════════════════════════════════════════════════════
 // VIEWS
 // ══════════════════════════════════════════════════════
-const views = ['overview','accounts','goals','upload'];
-let spendChart;
+const views = ['overview','insights','goals'];
+let spendChart, surplusChart, stackedChart;
+let currentTimePeriod = 'month';
 
 function switchView(v) {
   views.forEach(k => document.getElementById('view-'+k).style.display = k===v?'block':'none');
   document.querySelectorAll('.nav-tab').forEach((t,i) => t.classList.toggle('active', views[i]===v));
   if(v==='overview') renderOverview();
-  if(v==='accounts') renderAccounts();
+  if(v==='insights') renderInsights();
   if(v==='goals') renderGoals();
 }
 
-function renderAll() { renderOverview(); }
+// ── Toast ──
+function showToast(msg, duration=2500) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), duration);
+}
+
+// ── Import modal close ──
+function closeImportModal() {
+  closeModal('modal-import');
+  document.getElementById('review-section').style.display = 'none';
+  document.getElementById('drop-zone').style.display = 'block';
+  document.getElementById('file-chips').innerHTML = '';
+  document.getElementById('analyse-btn').style.display = 'none';
+  document.getElementById('select-file-btn').textContent = 'Select file';
+  uploadedFiles = [];
+  pendingReview = null;
+}
+
+// ── Quiz Engine ──
+const QUIZ = [
+  {
+    q: 'How are you sorted for housing?',
+    sub: 'This helps Fynn set up your fixed commitments.',
+    key: 'housing',
+    multi: false,
+    opts: ['I rent','I pay a mortgage','I own outright / staying with family','I have a property and rent separately']
+  },
+  {
+    q: 'How do you contribute to retirement?',
+    sub: 'EPF is deducted from your salary automatically if you\'re employed.',
+    key: 'retirement',
+    multi: false,
+    opts: ['EPF only (salaried)','EPF + private pension or investment','No EPF — self-employed or freelance']
+  },
+  {
+    q: 'Any active loans right now?',
+    sub: 'Select all that apply.',
+    key: 'loans',
+    multi: true,
+    opts: ['Car loan','Personal loan','Both car and personal loan','PTPTN / study loan','No loans']
+  },
+  {
+    q: 'Are you supporting anyone else at the moment?',
+    sub: 'Parents, children, or other dependants you contribute to financially.',
+    key: 'dependants',
+    multi: false,
+    opts: ['Yes — parents','Yes — children','Yes — both parents and children','No dependants']
+  },
+  {
+    q: 'How does your income come in?',
+    sub: 'This helps Fynn handle your income section correctly.',
+    key: 'income_type',
+    multi: false,
+    opts: ['Salary only','Salary + freelance or side income','Multiple salary sources']
+  }
+];
+
+let quizIdx = 0;
+let quizAnswers = {};
+let quizSelected = [];
+
+function startQuiz() {
+  quizIdx = 0;
+  quizAnswers = {};
+  quizSelected = [];
+  document.getElementById('quiz-screen').classList.add('show');
+  renderQuizStep();
+}
+
+function renderQuizStep() {
+  const q = QUIZ[quizIdx];
+  const total = QUIZ.length;
+  document.getElementById('quiz-progress').innerHTML =
+    QUIZ.map((_,i) => `<div class="quiz-pip ${i <= quizIdx ? 'done' : ''}"></div>`).join('');
+  document.getElementById('quiz-q').textContent = q.q;
+  document.getElementById('quiz-sub').textContent = q.sub;
+  document.getElementById('quiz-step').textContent = `${quizIdx+1} of ${total}`;
+  quizSelected = [];
+  document.getElementById('quiz-opts').innerHTML = q.opts.map((o,i) =>
+    `<button class="quiz-opt" onclick="quizSelect(${i})">${o}</button>`
+  ).join('');
+  document.getElementById('quiz-next-btn').textContent = quizIdx === total-1 ? 'Get started' : 'Continue';
+}
+
+function quizSelect(i) {
+  const q = QUIZ[quizIdx];
+  if (q.multi) {
+    const idx = quizSelected.indexOf(i);
+    if (idx > -1) quizSelected.splice(idx, 1);
+    else quizSelected.push(i);
+  } else {
+    quizSelected = [i];
+  }
+  document.querySelectorAll('.quiz-opt').forEach((el, j) => {
+    el.classList.toggle('selected', quizSelected.includes(j));
+  });
+}
+
+function quizNext() {
+  if (!quizSelected.length) return;
+  const q = QUIZ[quizIdx];
+  quizAnswers[q.key] = quizSelected.map(i => q.opts[i]);
+  if (quizIdx < QUIZ.length - 1) {
+    quizIdx++;
+    renderQuizStep();
+  } else {
+    finishQuiz();
+  }
+}
+
+function finishQuiz() {
+  // Build fixed commitments from quiz answers
+  const fixedItems = [];
+  const a = quizAnswers;
+
+  if (a.housing?.includes('I rent')) fixedItems.push({key:'rent',label:'Rent',amount:0});
+  if (a.housing?.includes('I pay a mortgage')) fixedItems.push({key:'mortgage',label:'Mortgage',amount:0});
+  if (a.dependants?.some(d => d.includes('parent'))) fixedItems.push({key:'parents',label:'Parents allowance',amount:0});
+  if (a.dependants?.some(d => d.includes('children'))) fixedItems.push({key:'children',label:'Children expenses',amount:0});
+  if (a.loans?.includes('Car loan') || a.loans?.includes('Both car and personal loan')) fixedItems.push({key:'carloan',label:'Car loan',amount:0});
+  if (a.loans?.includes('Personal loan') || a.loans?.includes('Both car and personal loan')) fixedItems.push({key:'personalloan',label:'Personal loan',amount:0});
+  if (a.loans?.includes('PTPTN / study loan')) fixedItems.push({key:'ptptn',label:'PTPTN / Study loan',amount:0});
+
+  // Store quiz answers in prefs
+  DB.prefs.quizDone = true;
+  DB.prefs.quizAnswers = a;
+  DB.prefs.defaultFixedItems = fixedItems;
+
+  // Handle income type
+  if (a.income_type?.includes('Salary + freelance')) {
+    DB.prefs.hasSideIncome = true;
+  }
+  if (a.retirement?.includes('No EPF')) {
+    DB.prefs.noEpf = true;
+  }
+
+  syncData();
+  document.getElementById('quiz-screen').classList.remove('show');
+  showToast('Welcome to Fynn 👋 Set your income to get started.');
+
+  // Show income prompt
+  document.getElementById('income-prompt').style.display = 'flex';
+  renderOverview();
+}
+
+// ── Insights ──
+function setTimePeriod(period, el) {
+  currentTimePeriod = period;
+  document.querySelectorAll('.time-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderInsights();
+}
+
+function getFilteredMonths() {
+  if (!DB.months?.length) return [];
+  const months = [...DB.months].sort((a,b) => new Date(a.month) - new Date(b.month));
+  if (currentTimePeriod === 'all') return months;
+  const now = new Date();
+  let cutoff = new Date();
+  if (currentTimePeriod === 'month') {
+    cutoff = new Date(now.getFullYear(), now.getMonth(), 1);
+  } else if (currentTimePeriod === '90d') {
+    cutoff = new Date(now - 90*24*60*60*1000);
+  } else if (currentTimePeriod === '120d') {
+    cutoff = new Date(now - 120*24*60*60*1000);
+  } else if (currentTimePeriod === '1y') {
+    cutoff = new Date(now - 365*24*60*60*1000);
+  }
+  return months.filter(m => new Date(m.month) >= cutoff);
+}
+
+function renderInsights() {
+  const filtered = getFilteredMonths();
+  if (!filtered.length) {
+    document.getElementById('insights-empty').style.display = 'block';
+    document.getElementById('insights-content').style.display = 'none';
+    return;
+  }
+  document.getElementById('insights-empty').style.display = 'none';
+  document.getElementById('insights-content').style.display = 'block';
+
+  const labels = filtered.map(m => m.month);
+  const surpluses = filtered.map(m => {
+    const ft = (m.fixedItems||[]).reduce((a,b)=>a+(b.amount||0),0) || Object.values(m.fixed||{}).reduce((a,b)=>a+b,0);
+    const vt = (m.variableItems||[]).reduce((a,b)=>a+(b.amount||0),0) || Object.values(m.variable||{}).reduce((a,b)=>a+b,0);
+    return (m.income||0) - ft - vt;
+  });
+
+  // Surplus trend
+  if (surplusChart) surplusChart.destroy();
+  surplusChart = new Chart(document.getElementById('surplusChart'), {
+    type: 'line',
+    data: { labels, datasets: [{ label:'Surplus', data:surpluses, borderColor:'#1D9E75', backgroundColor:'rgba(29,158,117,0.07)', fill:true, tension:0.35, pointBackgroundColor:'#1D9E75', pointRadius:5 }] },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+      scales: { y:{ticks:{callback:v=>'RM '+v.toLocaleString(),font:{size:10},color:'#666'},grid:{color:'rgba(255,255,255,0.04)'}}, x:{ticks:{font:{size:10},color:'#666'},grid:{display:false}} } }
+  });
+
+  // Stacked spending
+  const allKeys = new Set();
+  filtered.forEach(m => (m.variableItems||[]).forEach(i => allKeys.add(i.label)));
+  const vColors = ['#1D9E75','#378ADD','#c98a0a','#D4537E','#7F77DD','#888780','#D85A30','#5DCAA5','#c8f04d'];
+  const datasets = Array.from(allKeys).map((label, i) => ({
+    label, stack:'s', backgroundColor: vColors[i % vColors.length],
+    data: filtered.map(m => (m.variableItems||[]).find(x=>x.label===label)?.amount || 0)
+  }));
+
+  document.getElementById('insights-legend').innerHTML = Array.from(allKeys).map((l,i) =>
+    `<span class="li"><span class="ld" style="background:${vColors[i%vColors.length]};"></span>${l}</span>`
+  ).join('');
+
+  if (stackedChart) stackedChart.destroy();
+  stackedChart = new Chart(document.getElementById('stackedChart'), {
+    type: 'bar',
+    data: { labels, datasets },
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        y:{stacked:true,ticks:{callback:v=>'RM '+v.toLocaleString(),font:{size:10},color:'#666'},grid:{color:'rgba(255,255,255,0.04)'}},
+        x:{stacked:true,ticks:{font:{size:10},color:'#666'},grid:{display:false}}
+      }
+    }
+  });
+
+  // Month comparison table
+  if (filtered.length >= 2) {
+    const last2 = filtered.slice(-2);
+    const [a, b] = last2;
+    const ftA = (a.fixedItems||[]).reduce((s,i)=>s+(i.amount||0),0) || Object.values(a.fixed||{}).reduce((s,v)=>s+v,0);
+    const vtA = (a.variableItems||[]).reduce((s,i)=>s+(i.amount||0),0) || Object.values(a.variable||{}).reduce((s,v)=>s+v,0);
+    const ftB = (b.fixedItems||[]).reduce((s,i)=>s+(i.amount||0),0) || Object.values(b.fixed||{}).reduce((s,v)=>s+v,0);
+    const vtB = (b.variableItems||[]).reduce((s,i)=>s+(i.amount||0),0) || Object.values(b.variable||{}).reduce((s,v)=>s+v,0);
+    const rows = [
+      ['Take-home', a.income||0, b.income||0],
+      ['Fixed', ftA, ftB],
+      ['Variable', vtA, vtB],
+      ['Surplus', (a.income||0)-ftA-vtA, (b.income||0)-ftB-vtB],
+    ];
+    document.getElementById('month-compare-table').innerHTML = `
+      <div class="card" style="padding:0 1.2rem;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead><tr>
+            <th style="font-family:var(--mono);font-size:10px;color:var(--muted2);text-transform:uppercase;padding:8px 0;border-bottom:0.5px solid var(--b2);text-align:left;">Category</th>
+            <th style="font-family:var(--mono);font-size:10px;color:var(--muted2);text-transform:uppercase;padding:8px 0;border-bottom:0.5px solid var(--b2);text-align:right;">${a.month}</th>
+            <th style="font-family:var(--mono);font-size:10px;color:var(--muted2);text-transform:uppercase;padding:8px 0;border-bottom:0.5px solid var(--b2);text-align:right;">${b.month}</th>
+            <th style="font-family:var(--mono);font-size:10px;color:var(--muted2);text-transform:uppercase;padding:8px 0;border-bottom:0.5px solid var(--b2);text-align:right;">Diff</th>
+          </tr></thead>
+          <tbody>${rows.map(r => {
+            const diff = r[2]-r[1];
+            const col = diff===0?'var(--muted)':(r[0]==='Surplus'?(diff>0?'var(--green-l)':'var(--red)'):(diff>0?'var(--red)':'var(--green-l)'));
+            return `<tr>
+              <td style="padding:8px 0;border-bottom:0.5px solid var(--b1);color:var(--muted);">${r[0]}</td>
+              <td style="padding:8px 0;border-bottom:0.5px solid var(--b1);text-align:right;font-family:var(--mono);font-size:12px;">${rm(r[1])}</td>
+              <td style="padding:8px 0;border-bottom:0.5px solid var(--b1);text-align:right;font-family:var(--mono);font-size:12px;">${rm(r[2])}</td>
+              <td style="padding:8px 0;border-bottom:0.5px solid var(--b1);text-align:right;font-family:var(--mono);font-size:12px;color:${col};">${diff===0?'—':(diff>0?'↑':'↓')+' '+rm(Math.abs(diff))}</td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table>
+      </div>`;
+  } else {
+    document.getElementById('month-compare-table').innerHTML = `<div style="font-size:12px;color:var(--muted);padding:8px 0;">Upload at least 2 months to compare.</div>`;
+  }
+}
+
+
 
 // ── Helpers ──
 function rm(n) { return "RM " + Math.round(n||0).toLocaleString(); }
@@ -1240,12 +1584,18 @@ function addGoal() {
   const name = document.getElementById('new-goal-name').value.trim();
   const target = +document.getElementById('new-goal-target').value;
   const saved = +document.getElementById('new-goal-saved').value||0;
+  const start = document.getElementById('new-goal-start').value || new Date().toISOString().slice(0,10);
+  const end = document.getElementById('new-goal-end').value || null;
   if(!name||!target) return;
-  DB.goals.push({label:name,target,saved,color:goalColor,transactions:saved?[{type:'add',amount:saved,date:new Date().toISOString().slice(0,10),note:'Initial'}]:[]});
+  DB.goals.push({label:name, target, saved, color:goalColor, startDate:start, endDate:end,
+    transactions:saved?[{type:'add',amount:saved,date:start,note:'Initial'}]:[]});
   syncData(); closeModal('modal-add-goal');
   document.getElementById('new-goal-name').value='';
   document.getElementById('new-goal-target').value='';
   document.getElementById('new-goal-saved').value='';
+  document.getElementById('new-goal-start').value='';
+  document.getElementById('new-goal-end').value='';
+  showToast('Goal added ✓');
   renderGoals();
 }
 
@@ -1521,8 +1871,12 @@ function saveReview() {
   });
 
   const ei = DB.months.findIndex(m=>m.month===pendingReview.month);
-  if(ei>=0) { DB.months[ei]=pendingReview; DB.activeIdx=ei; }
-  else { DB.months.push(pendingReview); DB.activeIdx=DB.months.length-1; }
+  if(ei>=0) {
+    if(!confirm(`You already have data for ${pendingReview.month}. Replace it?`)) return;
+    DB.months[ei]=pendingReview; DB.activeIdx=ei;
+  } else {
+    DB.months.push(pendingReview); DB.activeIdx=DB.months.length-1;
+  }
 
   if(!DB.accounts.find(a=>a.name===pendingReview._acctName)) {
     DB.accounts.push({name:pendingReview._acctName,type:pendingReview._acctType,lastUpdated:pendingReview.month});
@@ -1537,6 +1891,8 @@ function saveReview() {
   document.getElementById('review-section').style.display='none';
   document.getElementById('drop-zone').style.display='block';
   document.getElementById('acct-name-input').value='';
+  closeModal('modal-import');
+  showToast('Month saved ✓');
   switchView('overview');
 }
 
@@ -1607,24 +1963,25 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
-  // Select file button triggers file picker
   selectBtn.addEventListener('click', function(e) {
     e.preventDefault();
     fi.click();
   });
 
-  // Analyse button triggers analysis
   analyseBtn.addEventListener('click', function(e) {
     e.preventDefault();
     analyseStatements();
   });
 
-  // File input change — single handler
   fi.addEventListener('change', function() {
     if (this.files && this.files.length) {
       handleFiles(this.files);
     }
   });
+
+  // Set today as default goal start date
+  const goalStart = document.getElementById('new-goal-start');
+  if (goalStart) goalStart.value = new Date().toISOString().slice(0,10);
 });
 
 init();
