@@ -740,10 +740,8 @@ input::placeholder{color:var(--muted);}
       <div class="ai-summary" id="ai-summary-box" style="display:none;">
         <span id="ai-summary-text"></span>
       </div>
-      <div class="card" style="padding:0.75rem 1.2rem;margin-bottom:1rem;">
-        <table class="rtable" id="review-table"></table>
-      </div>
-      <div style="display:flex;gap:8px;">
+      <div id="review-table"></div>
+      <div style="display:flex;gap:8px;margin-top:1rem;">
         <button class="btn btn-primary" onclick="saveReview()">Save month</button>
         <button class="btn" onclick="cancelReview()">Cancel</button>
       </div>
@@ -1811,7 +1809,7 @@ async function analyseStatements() {
     const fileContents = await Promise.all(uploadedFiles.map(readFileForClaude));
     document.getElementById('proc-status').textContent = 'Sending to AI…';
 
-    const systemPrompt = `You are a Malaysian personal finance AI. The user will give you bank/e-wallet statements. Extract spending data and return ONLY valid JSON with no markdown or explanation.`;
+    const systemPrompt = `You are a Malaysian personal finance AI. Extract spending from bank/e-wallet statements and return ONLY valid JSON, no markdown.`;
 
     const userContent = [
       ...fileContents,
@@ -1820,19 +1818,30 @@ async function analyseStatements() {
         text: `Account: "${acctName}" (type: ${selectedAcctType})
 User income: take-home RM ${DB.prefs.income||0}, gross RM ${DB.prefs.gross||0}
 
-Analyse the statement(s) above. If multiple months are present, calculate the MONTHLY AVERAGE for all spending categories — do not sum totals across months.
+Analyse the statement(s). If multiple months, calculate MONTHLY AVERAGES — do not sum across months.
 
-Return ONLY this JSON structure (no markdown):
-{"summary":"One sentence: what you found and averaged e.g. Found 3 months of UOB data (Jan–Mar 2026). Monthly averages calculated.","month":"Mon YYYY","income":${DB.prefs.income||0},"gross":${DB.prefs.gross||0},"epf":${DB.prefs.epf||0},"fixed":{"rent":0,"insurance":0,"loan":0,"gym":0},"variable":{"petrol":0,"food":0,"groceries":0,"shopping":0,"entertainment":0,"parking":0,"tolls":0,"transit":0,"tngFood":0},"loanActive":true}
+Return ONLY this JSON (no markdown, no explanation):
+{
+  "summary": "Plain English: what you found, how many months, biggest spend category",
+  "month": "Mon YYYY",
+  "income": ${DB.prefs.income||0},
+  "gross": ${DB.prefs.gross||0},
+  "epf": ${DB.prefs.epf||0},
+  "items": [
+    {"label": "Rent", "amount": 0, "type": "fixed", "confidence": "high"},
+    {"label": "Food & dining", "amount": 0, "type": "variable", "confidence": "high"}
+  ]
+}
 
-Rules:
-- month: most recent month e.g."Apr 2026"
-- If multiple months: divide all variable totals by number of months
-- rent~600, insurance/mum transfer~700, personal loan~521, gym/fitness~155
-- petrol=Shell/Petron, food=restaurants/cafes/delivery, groceries=supermarket/mart
-- shopping=retail/misc, entertainment=GSC/TGV/cinema, parking=TNG parking
-- tolls=RFID/highway, transit=LRT/bus/MRT, tngFood=TNG QR food
-- Use 0 if not found`
+Rules for items array:
+- Extract EVERY recurring or significant transaction as a separate item
+- type: "fixed" for same amount each month (rent, loans, subscriptions, insurance), "variable" for spending that changes
+- confidence: "high" if clearly identifiable, "low" if uncertain or uncategorised
+- label: use plain English names, not merchant codes. E.g. "Shell petrol" not "SHELL MYS 00123"
+- If you cannot identify what a transaction is, still include it with confidence "low" and label "Unknown — [merchant code]"
+- If multiple months: divide variable totals by number of months for monthly average
+- Do NOT omit items — include everything found, even small amounts
+- income/gross/epf: use user prefs if not found in statement`
       }
     ];
 
@@ -1841,7 +1850,7 @@ Rules:
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
-        max_tokens: 1000,
+        max_tokens: 2000,
         system: systemPrompt,
         messages: [{ role: "user", content: userContent }]
       })
@@ -1854,51 +1863,37 @@ Rules:
 
     const data = await res.json();
     if (data.error) throw new Error('API error: ' + (data.error.message || JSON.stringify(data.error)));
-    if (!data.content || !data.content.length) throw new Error('AI returned empty response. Data: ' + JSON.stringify(data).slice(0, 200));
+    if (!data.content || !data.content.length) throw new Error('AI returned empty response: ' + JSON.stringify(data).slice(0,200));
 
     document.getElementById('proc-status').textContent = 'Parsing results…';
     const rawText = data.content.map(x => x.text || '').join('').replace(/```json|```/g,'').trim();
-    // Find and parse the JSON object robustly
+
     let extracted;
     try {
-      // Try direct parse first
       extracted = JSON.parse(rawText);
     } catch(e) {
-      // Find the JSON object in the response
       const start = rawText.indexOf('{');
       const end = rawText.lastIndexOf('}');
-      if (start === -1 || end === -1) throw new Error('No JSON found: ' + rawText.slice(0,200));
+      if (start === -1 || end === -1) throw new Error('No JSON found in response: ' + rawText.slice(0,300));
       extracted = JSON.parse(rawText.slice(start, end + 1));
     }
-    // Ensure all required fields exist with defaults
+
+    // Normalise
     extracted.month = extracted.month || 'Unknown';
     extracted.income = extracted.income || DB.prefs.income || 0;
     extracted.gross = extracted.gross || DB.prefs.gross || 0;
     extracted.epf = extracted.epf || DB.prefs.epf || 0;
-    extracted.fixed = extracted.fixed || {};
-    extracted.variable = extracted.variable || {};
-    extracted.loanActive = extracted.loanActive !== undefined ? extracted.loanActive : true;
+    extracted.items = extracted.items || [];
 
-    // Extract summary and build items arrays
+    // Split into fixedItems and variableItems for Overview compatibility
+    extracted.fixedItems = extracted.items
+      .filter(i => i.type === 'fixed')
+      .map(i => ({key: 'f_'+i.label.replace(/\s+/g,'_').toLowerCase(), label: i.label, amount: i.amount||0, confidence: i.confidence||'high'}));
+    extracted.variableItems = extracted.items
+      .filter(i => i.type === 'variable')
+      .map(i => ({key: 'v_'+i.label.replace(/\s+/g,'_').toLowerCase(), label: i.label, amount: i.amount||0, confidence: i.confidence||'high'}));
+
     const summary = extracted.summary || '';
-    extracted.fixedItems = [
-      {key:'rent', label:'Rent', amount:extracted.fixed.rent||0},
-      {key:'insurance', label:'Insurance + mum', amount:extracted.fixed.insurance||0},
-      {key:'loan', label:'Personal loan', amount:extracted.fixed.loan||0},
-      {key:'gym', label:'Gym — Anytime Fitness', amount:extracted.fixed.gym||0},
-    ].filter(i => i.amount > 0);
-    extracted.variableItems = [
-      {key:'petrol',label:'Petrol',amount:extracted.variable.petrol||0},
-      {key:'food',label:'Food & dining',amount:extracted.variable.food||0},
-      {key:'groceries',label:'Groceries',amount:extracted.variable.groceries||0},
-      {key:'shopping',label:'Shopping & misc',amount:extracted.variable.shopping||0},
-      {key:'entertainment',label:'Entertainment',amount:extracted.variable.entertainment||0},
-      {key:'parking',label:'TNG parking',amount:extracted.variable.parking||0},
-      {key:'tolls',label:'TNG tolls',amount:extracted.variable.tolls||0},
-      {key:'transit',label:'TNG transit',amount:extracted.variable.transit||0},
-      {key:'tngFood',label:'TNG food QR',amount:extracted.variable.tngFood||0},
-    ].filter(i => i.amount > 0);
-
     extracted._acctName = acctName;
     extracted._acctType = selectedAcctType;
 
@@ -1950,52 +1945,149 @@ function showReview(extracted, summary) {
   pendingReview = extracted;
   document.getElementById('review-month-label').textContent = `Month: ${extracted.month||'?'} · Account: ${extracted._acctName}`;
 
-  // Show AI summary if provided
+  // AI summary paragraph
   const summaryEl = document.getElementById('ai-summary-text');
-  if (summaryEl && summary) {
-    summaryEl.textContent = summary;
-    summaryEl.parentElement.style.display = 'block';
-  } else if (summaryEl) {
-    summaryEl.parentElement.style.display = 'none';
+  if (summaryEl) {
+    if (summary) { summaryEl.textContent = summary; summaryEl.parentElement.style.display = 'block'; }
+    else { summaryEl.parentElement.style.display = 'none'; }
   }
 
   document.getElementById('review-section').style.display = 'block';
 
-  const rows = [
-    {s:'Income',k:'income',l:'Take-home pay',v:extracted.income},
-    {s:'',k:'gross',l:'Gross pay',v:extracted.gross},
-    {s:'',k:'epf',l:'EPF',v:extracted.epf},
-    {s:'Fixed',k:'fixed.rent',l:'Rent',v:extracted.fixed.rent},
-    {s:'',k:'fixed.insurance',l:'Insurance + mum',v:extracted.fixed.insurance},
-    {s:'',k:'fixed.loan',l:'Personal loan',v:extracted.fixed.loan},
-    {s:'',k:'fixed.gym',l:'Gym',v:extracted.fixed.gym},
-    {s:'Variable',k:'variable.petrol',l:'Petrol',v:extracted.variable.petrol},
-    {s:'',k:'variable.food',l:'Food & dining',v:extracted.variable.food},
-    {s:'',k:'variable.groceries',l:'Groceries',v:extracted.variable.groceries},
-    {s:'',k:'variable.shopping',l:'Shopping',v:extracted.variable.shopping},
-    {s:'',k:'variable.entertainment',l:'Entertainment',v:extracted.variable.entertainment},
-    {s:'',k:'variable.parking',l:'TNG parking',v:extracted.variable.parking},
-    {s:'',k:'variable.tolls',l:'TNG tolls',v:extracted.variable.tolls},
-    {s:'',k:'variable.transit',l:'TNG transit',v:extracted.variable.transit},
-    {s:'',k:'variable.tngFood',l:'TNG food QR',v:extracted.variable.tngFood},
+  // Build grouped review list
+  const items = extracted.items || [
+    ...((extracted.fixedItems||[]).map(i=>({...i, type:'fixed'}))),
+    ...((extracted.variableItems||[]).map(i=>({...i, type:'variable'})))
   ];
 
+  const lowItems = items.filter(i => i.confidence === 'low');
+  const highItems = items.filter(i => i.confidence !== 'low');
+  const fixedItems = highItems.filter(i => i.type === 'fixed');
+  const varItems = highItems.filter(i => i.type === 'variable');
+
+  const renderItem = (item, idx, group) => `
+    <div class="row" style="align-items:center;gap:8px;" id="review-item-${group}-${idx}">
+      <span style="flex:1;min-width:0;">
+        <span id="rlabel-${group}-${idx}" style="cursor:pointer;font-size:13px;" onclick="editReviewLabel('${group}',${idx})">${item.label}</span>
+        <span style="font-size:10px;font-family:var(--mono);padding:1px 6px;border-radius:4px;margin-left:6px;background:${item.type==='fixed'?'var(--red-bg)':'var(--amber-bg)'};color:${item.type==='fixed'?'var(--red)':'var(--amber-l)'};">${item.type}</span>
+      </span>
+      <span style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+        <span id="rval-${group}-${idx}" style="font-family:var(--mono);font-size:12px;color:var(--muted);">RM ${item.amount||0}</span>
+        <button class="edit-btn" onclick="editReviewVal('${group}',${idx})">✎</button>
+        <button class="del-row-btn" onclick="deleteReviewItem('${group}',${idx})">✕</button>
+      </span>
+    </div>`;
+
   document.getElementById('review-table').innerHTML = `
-    <thead><tr><th>Category</th><th style="text-align:right;">Extracted</th><th style="text-align:right;">Edit</th></tr></thead>
-    <tbody>${rows.map(r=>`<tr>
-      <td style="color:var(--muted);">${r.s?`<span style="font-family:var(--mono);font-size:10px;color:var(--muted2);text-transform:uppercase;">${r.s}</span><br>`:''}<span style="font-size:13px;">${r.l}</span></td>
-      <td style="text-align:right;font-family:var(--mono);font-size:11px;color:var(--muted2);">RM ${r.v}</td>
-      <td style="text-align:right;"><input type="number" data-key="${r.k}" value="${r.v}"></td>
-    </tr>`).join('')}</tbody>
+    <div style="margin-bottom:1rem;">
+      <div class="slabel" style="margin-top:0;">Income</div>
+      <div class="card" style="padding:0 1.2rem;">
+        <div class="row"><span>Take-home</span><span style="display:flex;align-items:center;gap:6px;"><span id="rv-income" style="font-family:var(--mono);font-size:12px;color:var(--muted);">RM ${extracted.income}</span><button class="edit-btn" onclick="editReviewIncome('income')">✎</button></span></div>
+        <div class="row"><span>Gross pay</span><span style="display:flex;align-items:center;gap:6px;"><span id="rv-gross" style="font-family:var(--mono);font-size:12px;color:var(--muted);">RM ${extracted.gross}</span><button class="edit-btn" onclick="editReviewIncome('gross')">✎</button></span></div>
+        <div class="row"><span>EPF</span><span style="font-family:var(--mono);font-size:12px;color:var(--muted);">RM ${extracted.epf}</span></div>
+      </div>
+    </div>
+
+    ${fixedItems.length ? `
+    <div style="margin-bottom:1rem;">
+      <div class="slabel">Fixed commitments</div>
+      <div class="card" style="padding:0 1.2rem;">
+        ${fixedItems.map((item,i) => renderItem(item, i, 'fixed')).join('')}
+      </div>
+    </div>` : ''}
+
+    ${varItems.length ? `
+    <div style="margin-bottom:1rem;">
+      <div class="slabel">Variable spending</div>
+      <div class="card" style="padding:0 1.2rem;">
+        ${varItems.map((item,i) => renderItem(item, i, 'var')).join('')}
+      </div>
+    </div>` : ''}
+
+    ${lowItems.length ? `
+    <div style="margin-bottom:1rem;">
+      <div class="slabel" style="color:var(--amber-l);">⚠ Needs your review</div>
+      <div class="card" style="padding:0 1.2rem;border-left:2px solid var(--amber);">
+        ${lowItems.map((item,i) => renderItem(item, i, 'low')).join('')}
+      </div>
+    </div>` : ''}
+
+    <button class="add-row-btn" onclick="addReviewItem()" style="border-top:none;padding-top:0;">+ Add item manually</button>
   `;
 }
 
+// Review screen inline edit helpers
+function editReviewIncome(field) {
+  const el = document.getElementById('rv-' + field);
+  const cur = pendingReview[field] || 0;
+  el.outerHTML = `<input class="inline-input" id="rv-${field}" type="number" value="${cur}" onblur="saveReviewIncome('${field}',this.value)" onkeydown="if(event.key==='Enter')this.blur()" style="width:90px;">`;
+  document.getElementById('rv-' + field).focus();
+}
+function saveReviewIncome(field, val) {
+  pendingReview[field] = +val || 0;
+}
+
+function editReviewLabel(group, idx) {
+  const items = getReviewGroup(group);
+  const el = document.getElementById(`rlabel-${group}-${idx}`);
+  const cur = items[idx].label;
+  el.outerHTML = `<input class="inline-label" id="rlabel-${group}-${idx}" type="text" value="${cur}" onblur="saveReviewLabel('${group}',${idx},this.value)" onkeydown="if(event.key==='Enter')this.blur()">`;
+  document.getElementById(`rlabel-${group}-${idx}`).focus();
+}
+function saveReviewLabel(group, idx, val) {
+  getReviewGroup(group)[idx].label = val || getReviewGroup(group)[idx].label;
+  syncReviewToExtracted();
+}
+
+function editReviewVal(group, idx) {
+  const items = getReviewGroup(group);
+  const el = document.getElementById(`rval-${group}-${idx}`);
+  const cur = items[idx].amount || 0;
+  el.innerHTML = `<input class="inline-input" type="number" value="${cur}" onblur="saveReviewVal('${group}',${idx},this.value)" onkeydown="if(event.key==='Enter')this.blur()" style="width:80px;">`;
+  el.querySelector('input').focus();
+}
+function saveReviewVal(group, idx, val) {
+  getReviewGroup(group)[idx].amount = +val || 0;
+  syncReviewToExtracted();
+}
+
+function deleteReviewItem(group, idx) {
+  getReviewGroup(group).splice(idx, 1);
+  syncReviewToExtracted();
+  showReview(pendingReview, '');
+}
+
+function addReviewItem() {
+  const label = prompt('Item name:', '') || 'New item';
+  const amount = +prompt('Amount (RM):', '0') || 0;
+  const type = confirm('Is this a fixed commitment (same each month)?\nOK = Fixed, Cancel = Variable') ? 'fixed' : 'variable';
+  if (!pendingReview.items) pendingReview.items = [...(pendingReview.fixedItems||[]).map(i=>({...i,type:'fixed'})), ...(pendingReview.variableItems||[]).map(i=>({...i,type:'variable'}))];
+  pendingReview.items.push({label, amount, type, confidence:'high', key:'manual_'+Date.now()});
+  syncReviewToExtracted();
+  showReview(pendingReview, '');
+}
+
+function getReviewGroup(group) {
+  const allItems = pendingReview.items || [
+    ...(pendingReview.fixedItems||[]).map(i=>({...i,type:'fixed'})),
+    ...(pendingReview.variableItems||[]).map(i=>({...i,type:'variable'}))
+  ];
+  if (!pendingReview.items) pendingReview.items = allItems;
+  if (group === 'fixed') return pendingReview.items.filter(i=>i.type==='fixed'&&i.confidence!=='low');
+  if (group === 'var') return pendingReview.items.filter(i=>i.type==='variable'&&i.confidence!=='low');
+  if (group === 'low') return pendingReview.items.filter(i=>i.confidence==='low');
+  return pendingReview.items;
+}
+
+function syncReviewToExtracted() {
+  const items = pendingReview.items || [];
+  pendingReview.fixedItems = items.filter(i=>i.type==='fixed').map(i=>({key:i.key||'f_'+i.label,label:i.label,amount:i.amount||0}));
+  pendingReview.variableItems = items.filter(i=>i.type==='variable').map(i=>({key:i.key||'v_'+i.label,label:i.label,amount:i.amount||0}));
+}
+
 function saveReview() {
-  document.querySelectorAll('#review-table input[data-key]').forEach(inp => {
-    const keys = inp.dataset.key.split('.');
-    if(keys.length===1) pendingReview[keys[0]] = +inp.value;
-    else pendingReview[keys[0]][keys[1]] = +inp.value;
-  });
+  // Sync any pending inline edits
+  syncReviewToExtracted();
 
   const ei = DB.months.findIndex(m=>m.month===pendingReview.month);
   if(ei>=0) {
@@ -2005,6 +2097,7 @@ function saveReview() {
     DB.months.push(pendingReview); DB.activeIdx=DB.months.length-1;
   }
 
+  if(!DB.accounts) DB.accounts = [];
   if(!DB.accounts.find(a=>a.name===pendingReview._acctName)) {
     DB.accounts.push({name:pendingReview._acctName,type:pendingReview._acctType,lastUpdated:pendingReview.month});
   } else {
