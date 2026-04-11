@@ -1183,6 +1183,10 @@ Rules: month=statement month e.g."May 2026", rent~600, insurance/mum transfer~70
     proc.classList.remove('show');
     document.getElementById('drop-zone').style.display = 'block';
     showReview(extracted);
+    // Scroll review into view on mobile
+    setTimeout(() => {
+      document.getElementById('review-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
 
   } catch(err) {
     proc.classList.remove('show');
